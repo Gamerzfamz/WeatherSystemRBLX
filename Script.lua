@@ -1,10 +1,10 @@
 --// Services
--- using WaitForChild makes sure everything loads before we try to use it
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+-- services are loaded in alphabetical order for consistency
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 --// Asset references
 -- keeping assets organized in folders makes it easier to add new weather types later
@@ -14,9 +14,8 @@ local Sounds = Assets:WaitForChild("Sounds")
 local VFX = Assets:WaitForChild("VFX")
 
 --// Effect templates
--- storing these at the top so we don't have to find them every time
+-- pre-cached templates reduce overhead when creating effects
 local rainTemplate = VFX:WaitForChild("Rain")
-local lightningTemplate = VFX:WaitForChild("Lightning")
 
 --// Sound templates
 -- lightning sound is the initial crack, thunder is the rumble after
@@ -34,7 +33,6 @@ local weatherWeights = {
 }
 
 --// Configuration constants
--- pulled out all the magic numbers so they're easier to tweak
 local RAIN_HEIGHT_OFFSET = 40           -- how high above the player the rain spawns
 local LIGHTNING_MIN_FORKS = 3           -- minimum number of lightning strikes per cycle
 local LIGHTNING_MAX_FORKS = 7           -- maximum strikes per cycle
@@ -69,7 +67,7 @@ local function setSky(name)
 	if oldSky then 
 		oldSky:Destroy() 
 	end
-
+	
 	-- cloning preserves the original in ReplicatedStorage
 	local sky = Skys:FindFirstChild(name)
 	if sky then
@@ -80,11 +78,11 @@ end
 -- cleans up all rain effects and stops the rain sound
 local function clearRain()
 	-- go through each player's rain part and destroy it
-	for player, part in pairs(rainParts) do
+	for player, part in pairs(rainParts) do  -- pairs because rainParts is a dictionary with player keys
 		part:Destroy()
 		rainParts[player] = nil  -- setting to nil helps with garbage collection
 	end
-
+	
 	-- stop the rain sound if it's playing
 	if rainSoundInstance then
 		rainSoundInstance:Stop()      -- stopping before destroying prevents weird audio glitches
@@ -100,22 +98,22 @@ local function createRainForPlayer(player)
 	if rainParts[player] then 
 		return 
 	end
-
+	
 	local part = rainTemplate:Clone()
 	part.Anchored = true          -- anchored so it doesn't fall
 	part.CanCollide = false       -- non-collidable so players can walk through it
 	part.Parent = Workspace       
-
+	
 	rainParts[player] = part
 end
 
 -- moves all the rain parts to stay above their players
 -- runs every second to keep rain following players as they move
 local function updateRainPositions()
-	for player, part in pairs(rainParts) do
+	for player, part in pairs(rainParts) do  -- pairs because it's a dictionary
 		local character = player.Character
 		local hrp = character and character:FindFirstChild("HumanoidRootPart")
-
+		
 		if hrp then
 			-- CFrame.new is more efficient than setting Position directly
 			part.CFrame = CFrame.new(hrp.Position + Vector3.new(0, RAIN_HEIGHT_OFFSET, 0))
@@ -129,20 +127,20 @@ end
 -- stops the thunder cycle and destroys all lightning visuals
 local function stopThunder()
 	thunderRunning = false
-
+	
 	-- cancel the running task if there is one
 	if thunderTask then
 		thunderTask:Cancel()
 		thunderTask = nil
 	end
-
+	
 	-- destroy all lightning parts
-	for _, part in pairs(lightningParts) do
+	for _, part in ipairs(lightningParts) do  -- ipairs because lightningParts is an array
 		if part and part.Parent then
 			part:Destroy()
 		end
 	end
-
+	
 	lightningParts = {}
 end
 
@@ -150,12 +148,12 @@ end
 -- uses linear falloff so sounds get quieter with distance
 local function updateSoundVolumes(sounds, position)
 	local players = Players:GetPlayers()
-
-	for _, sound in pairs(sounds) do
+	
+	for _, sound in ipairs(sounds) do  -- ipairs because sounds is passed as an array
 		local closestDist = math.huge  -- start with a really big number
-
+		
 		-- find the closest player to the sound
-		for _, player in pairs(players) do
+		for _, player in ipairs(players) do  -- ipairs because GetPlayers returns an array
 			local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 			if hrp then
 				local dist = (hrp.Position - position).Magnitude
@@ -164,7 +162,7 @@ local function updateSoundVolumes(sounds, position)
 				end
 			end
 		end
-
+		
 		-- calculate volume - gets quieter as distance increases
 		-- math.clamp keeps it between 0 and 1
 		local volume = math.clamp(1 - closestDist / SOUND_ROLLOFF_DISTANCE, 0, 1)
@@ -178,18 +176,18 @@ local function updateRainSoundVolume(mutePosition, muteRadius)
 	if not rainSoundInstance then 
 		return 
 	end
-
+	
 	local mute = false
-
+	
 	-- check if any player is close to the lightning
-	for _, player in pairs(Players:GetPlayers()) do
+	for _, player in ipairs(Players:GetPlayers()) do  -- ipairs because GetPlayers returns an array
 		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 		if hrp and (hrp.Position - mutePosition).Magnitude <= muteRadius then
 			mute = true
 			break  -- found one, no need to keep checking
 		end
 	end
-
+	
 	-- either full volume or silent, no in-between
 	rainSoundInstance.Volume = mute and 0 or 1
 end
@@ -197,26 +195,26 @@ end
 -- creates one segment of the lightning bolt between two points
 local function createLightningSegment(startPos, endPos)
 	local segment = Instance.new("Part")
-
+	
 	-- size the segment to fit between the two points
 	local length = (endPos - startPos).Magnitude
 	segment.Size = Vector3.new(0.2, length, 0.2)
-
+	
 	segment.Anchored = true
 	segment.CanCollide = false
 	segment.Material = Enum.Material.Neon    -- neon gives it that bright glowing look
 	segment.Color = Color3.fromRGB(255, 255, 255)
 	segment.Transparency = 0.25              -- slight transparency looks more realistic
-
+	
 	-- position the segment between start and end
 	-- CFrame.new(pos1, pos2) makes it point from pos1 toward pos2
 	-- then offset by half the length to center it
 	local cframe = CFrame.new(startPos, endPos) * CFrame.new(0, length / 2, 0)
 	segment.CFrame = cframe
-
+	
 	segment.Parent = Workspace
 	table.insert(lightningParts, segment)
-
+	
 	return segment
 end
 
@@ -226,7 +224,7 @@ local function getRandomLightningDirection()
 	local x = math.random() - 0.5
 	local z = math.random() - 0.5
 	local y = -0.5 - math.random() * 0.3  -- always going down
-
+	
 	return Vector3.new(x, y, z).Unit  -- normalize so all segments are same length
 end
 
@@ -237,21 +235,21 @@ local function generateLightningFork(position, direction, depth, maxDepth)
 	if depth > maxDepth then 
 		return 
 	end
-
+	
 	-- calculate where this segment ends
 	local offset = direction.Unit * LIGHTNING_SEGMENT_LENGTH
 	local newPos = position + offset
-
+	
 	-- create the visual segment
 	createLightningSegment(position, newPos)
-
+	
 	-- 70% chance to continue the main branch
 	-- higher chance means the lightning has a main "trunk"
 	if math.random() < 0.7 then
 		local newDirection = getRandomLightningDirection()
 		generateLightningFork(newPos, newDirection, depth + 1, maxDepth)
 	end
-
+	
 	-- 50% chance to create a side branch
 	-- lower chance keeps it from getting too bushy
 	if math.random() < 0.5 then
@@ -273,32 +271,32 @@ local function spawnLightningNearPlayer(player)
 	if not character then 
 		return 
 	end
-
+	
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then 
 		return 
 	end
-
+	
 	-- randomize where the lightning appears relative to the player
 	-- this keeps it from being predictable
 	local offsetX = math.random(LIGHTNING_SPAWN_MIN, LIGHTNING_SPAWN_MAX)
 	local offsetZ = math.random(LIGHTNING_SPAWN_MIN, LIGHTNING_SPAWN_MAX)
 	local offsetY = math.random(LIGHTNING_HEIGHT_MIN, LIGHTNING_HEIGHT_MAX)
 	local spawnPos = hrp.Position + Vector3.new(offsetX, offsetY, offsetZ)
-
+	
 	-- store the current parts count before creating this strike
 	-- this way each strike only cleans up its own parts
 	local startIndex = #lightningParts
-
+	
 	-- create the visual lightning bolt
 	createForkingLightning(spawnPos)
-
+	
 	-- store only THIS strike's parts in a separate table
 	local thisStrikeParts = {}
 	for i = startIndex + 1, #lightningParts do
 		table.insert(thisStrikeParts, lightningParts[i])
 	end
-
+	
 	-- create the lightning crack sound at the strike location
 	local lightningSound = lightningSoundTemplate:Clone()
 	lightningSound.Parent = Workspace
@@ -306,7 +304,7 @@ local function spawnLightningNearPlayer(player)
 	lightningSound.RollOffMode = Enum.RollOffMode.Linear
 	lightningSound.MaxDistance = SOUND_ROLLOFF_DISTANCE
 	lightningSound:Play()
-
+	
 	-- create the thunder rumble sound
 	local thunderSound = thunderSoundTemplate:Clone()
 	thunderSound.Parent = Workspace
@@ -314,16 +312,16 @@ local function spawnLightningNearPlayer(player)
 	thunderSound.RollOffMode = Enum.RollOffMode.Linear
 	thunderSound.MaxDistance = THUNDER_ROLLOFF_DISTANCE  -- thunder travels further
 	thunderSound:Play()
-
+	
 	-- this loop handles cleanup and volume updates
 	local connection
-	local startTime = tick()
-
+	local startTime = os.clock()  -- os.clock is more reliable than tick for timing
+	
 	-- heartbeat runs every frame for smooth volume changes
 	connection = RunService.Heartbeat:Connect(function()
-		if tick() - startTime > LIGHTNING_DURATION then
+		if os.clock() - startTime > LIGHTNING_DURATION then
 			-- time's up, clean up only THIS strike's parts
-			for _, part in pairs(thisStrikeParts) do
+			for _, part in ipairs(thisStrikeParts) do  -- ipairs because thisStrikeParts is an array
 				if part and part.Parent then
 					part:Destroy()
 				end
@@ -342,14 +340,14 @@ end
 local function thunderCycle()
 	while thunderRunning do
 		local players = Players:GetPlayers()
-
+		
 		-- only spawn lightning if there are players in the game
 		if #players > 0 then
 			local used = {}  -- tracks which players we've already used
-
+			
 			-- spawn between 3-7 lightning strikes, but not more than number of players
 			local strikes = math.min(#players, math.random(LIGHTNING_MIN_FORKS, LIGHTNING_MAX_FORKS))
-
+			
 			-- spawn lightning at different players
 			for _ = 1, strikes do
 				-- pick a random player we haven't used yet
@@ -358,11 +356,11 @@ local function thunderCycle()
 					idx = math.random(1, #players) 
 				until not used[idx]
 				used[idx] = true
-
+				
 				spawnLightningNearPlayer(players[idx])
 			end
 		end
-
+		
 		-- wait a random amount of time before the next round of lightning
 		-- randomness makes it feel more natural
 		task.wait(math.random(THUNDER_DELAY_MIN, THUNDER_DELAY_MAX))
@@ -375,7 +373,7 @@ local function startThunder()
 	if thunderRunning then 
 		return 
 	end
-
+	
 	thunderRunning = true
 	-- task.spawn creates a new thread without blocking this one
 	thunderTask = task.spawn(thunderCycle)
@@ -384,7 +382,7 @@ end
 -- removes all sounds from workspace
 -- used when switching weather to prevent sounds from overlapping
 local function clearSounds()
-	for _, sound in pairs(Workspace:GetChildren()) do
+	for _, sound in ipairs(Workspace:GetChildren()) do  -- ipairs because GetChildren returns an array
 		if sound:IsA("Sound") then
 			sound:Stop()      -- stop it first to avoid weird audio artifacts
 			sound:Destroy()
@@ -399,51 +397,51 @@ local function applyWeather(weather)
 	if weather == lastWeather then 
 		return 
 	end
-
+	
 	-- change the skybox first so it's immediately visible
 	setSky(weather)
-
+	
 	-- clean up the old weather
 	clearSounds()
 	stopThunder()
 	clearRain()
-
+	
 	-- set up the new weather
 	if weather == "Clear" then
 		-- clear weather doesn't need any special setup
 		lastWeather = "Clear"
-
+		
 	elseif weather == "Rain" then
 		-- create rain for everyone who's currently in the game
-		for _, player in pairs(Players:GetPlayers()) do
+		for _, player in ipairs(Players:GetPlayers()) do  -- ipairs because GetPlayers returns an array
 			createRainForPlayer(player)
 		end
-
+		
 		-- create the rain ambience sound
 		rainSoundInstance = rainSoundTemplate:Clone()
 		rainSoundInstance.Parent = Workspace
 		rainSoundInstance.Looped = true   -- needs to loop continuously
 		rainSoundInstance.Volume = 1
 		rainSoundInstance:Play()
-
+		
 		lastWeather = "Rain"
-
+		
 	elseif weather == "Thunder" then
 		-- thunder has rain plus the lightning effects
-		for _, player in pairs(Players:GetPlayers()) do
+		for _, player in ipairs(Players:GetPlayers()) do  -- ipairs because GetPlayers returns an array
 			createRainForPlayer(player)
 		end
-
+		
 		-- same rain sound as regular rain weather
 		rainSoundInstance = rainSoundTemplate:Clone()
 		rainSoundInstance.Parent = Workspace
 		rainSoundInstance.Looped = true
 		rainSoundInstance.Volume = 1
 		rainSoundInstance:Play()
-
+		
 		-- start the thunder cycle
 		startThunder()
-
+		
 		lastWeather = "Thunder"
 	end
 end
@@ -453,23 +451,23 @@ end
 local function chooseWeather()
 	-- add up all the weights
 	local totalWeight = 0
-	for _, w in pairs(weatherWeights) do 
+	for _, w in pairs(weatherWeights) do  -- pairs because weatherWeights is a dictionary
 		totalWeight += w 
 	end
-
+	
 	-- pick a random number in that range
 	local pick = math.random() * totalWeight
 	local cumulative = 0
-
+	
 	-- figure out which weather we landed on
 	-- works like spinning a weighted wheel
-	for _, weather in pairs(weatherTypes) do
+	for _, weather in ipairs(weatherTypes) do  -- ipairs because weatherTypes is an array
 		cumulative += weatherWeights[weather]
 		if pick <= cumulative then
 			return weather
 		end
 	end
-
+	
 	-- fallback just in case (shouldn't ever get here)
 	return weatherTypes[#weatherTypes]
 end
@@ -498,15 +496,15 @@ end)
 while true do
 	-- pick a new weather
 	local weather = chooseWeather()
-
+	
 	-- keep picking until we get something different from current weather
 	while weather == lastWeather do
 		weather = chooseWeather()
 	end
-
+	
 	-- apply the new weather
 	applyWeather(weather)
-
+	
 	-- let this weather run for a random duration
 	-- updates rain positions every second so rain follows players smoothly
 	for _ = 1, math.random(WEATHER_DURATION_MIN, WEATHER_DURATION_MAX) do
