@@ -1,4 +1,4 @@
---// Services
+--// Services (alphabetical order per Roblox style guide)
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,19 +6,19 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 --// Asset references
--- assets are organized in ReplicatedStorage for easy modification
-local Assets = ReplicatedStorage:WaitForChild("WeatherAssets")
-local Skys = Assets:WaitForChild("Skys")
-local Sounds = Assets:WaitForChild("Sounds")
-local VFX = Assets:WaitForChild("VFX")
+-- direct indexing for ReplicatedStorage assets since they're guaranteed to exist at runtime
+local Assets = ReplicatedStorage.WeatherAssets
+local Skys = Assets.Skys
+local Sounds = Assets.Sounds
+local VFX = Assets.VFX
 
 --// Effect templates
-local rainTemplate = VFX:WaitForChild("Rain")
+local rainTemplate = VFX.Rain
 
 --// Sound templates
-local lightningSoundTemplate = Sounds:WaitForChild("Thunder")
-local thunderSoundTemplate = Sounds:WaitForChild("Thunder")
-local rainSoundTemplate = Sounds:WaitForChild("Rain")
+local lightningSoundTemplate = Sounds.Thunder
+local thunderSoundTemplate = Sounds.Thunder
+local rainSoundTemplate = Sounds.Rain
 
 --// Weather configuration
 local weatherTypes = {"Clear", "Rain", "Thunder"}
@@ -28,7 +28,7 @@ local weatherWeights = {
 	Thunder = 2,
 }
 
---// Configuration constants
+--// Configuration constants (LOUD_SNAKE_CASE per Roblox style guide)
 local RAIN_HEIGHT_OFFSET = 40
 local RAIN_FOLLOW_SPEED = 0.15
 local LIGHTNING_MIN_STRIKES = 3
