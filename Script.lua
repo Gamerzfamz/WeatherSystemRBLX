@@ -1,4 +1,4 @@
---// Services (alphabetical order per Roblox style guide)
+--// Services
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,7 +6,6 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 --// Asset references
--- direct indexing for ReplicatedStorage assets since they're guaranteed to exist at runtime
 local Assets = ReplicatedStorage.WeatherAssets
 local Skys = Assets.Skys
 local Sounds = Assets.Sounds
@@ -28,7 +27,7 @@ local weatherWeights = {
 	Thunder = 2,
 }
 
---// Configuration constants (LOUD_SNAKE_CASE per Roblox style guide)
+--// Configuration constants
 local RAIN_HEIGHT_OFFSET = 40
 local RAIN_FOLLOW_SPEED = 0.15
 local LIGHTNING_MIN_STRIKES = 3
@@ -155,8 +154,7 @@ function LightningStrike.new(position)
 	return self
 end
 
--- recursive function builds branching structure
--- uses CFrame.Angles to rotate direction vectors for natural-looking forks
+-- uses CFrame.Angles to rotate direction vectors
 function LightningStrike:generateBranch(startPos, direction, depth)
 	if depth > LIGHTNING_FORK_DEPTH then
 		return
